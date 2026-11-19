@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "S4N_100_OSHPRO_ES",
+			"uri": "abap:/repotree-v1/S4N_100_OSHPRO_ES"
+		}
+	],
+	"settings": {}
+}
