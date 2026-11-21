@@ -44,6 +44,7 @@ CLASS lcl_aper DEFINITION.
                 go_doc    TYPE REF TO cl_dd_document,
                 go_grid   TYPE REF TO cl_gui_alv_grid,
                 gs_key    TYPE ty_aper,
+                gv_bukrs_pag TYPE bkpf-bukrs,   " Sociedad del pagador (F4 / validación)
                 gt_aper   TYPE tt_aper.
 
     CLASS-METHODS:
@@ -104,6 +105,16 @@ CLASS lcl_aper IMPLEMENTATION.
                       belnr = iv_belnr
                       gjahr = iv_gjahr
                       waers = iv_waers ).
+
+    " Imputaciones contra la sociedad del pagador (KNA1-VBUND);
+    " si el pagador no la tiene informada, la del documento contable
+    gv_bukrs_pag = COND #( WHEN gv_vbund IS NOT INITIAL THEN CONV #( gv_vbund )
+                           ELSE iv_bukrs ).
+    IF gv_vbund IS INITIAL.
+      MESSAGE |El pagador { gv_kunrg ALPHA = OUT } no tiene sociedad (VBUND); se usa la sociedad { iv_bukrs }|
+              TYPE 'S' DISPLAY LIKE 'W'.
+    ENDIF.
+
     read_data( ).
 
     DATA lv_caption TYPE c LENGTH 100.
@@ -170,7 +181,8 @@ CLASS lcl_aper IMPLEMENTATION.
 
     go_doc = NEW #( ).
     go_doc->add_text(
-      text      = CONV #( |Factura: { gv_vbeln ALPHA = OUT }     Pagador: { gv_kunrg ALPHA = OUT } { lv_name1 }| )
+      text      = CONV #( |Factura: { gv_vbeln ALPHA = OUT }     Pagador: { gv_kunrg ALPHA = OUT } { lv_name1 }| &&
+                     |     Sociedad del Pagador: { gv_bukrs_pag }| )
       sap_emphasis = cl_dd_area=>strong ).
     go_doc->new_line( ).
     go_doc->add_text(
@@ -342,7 +354,7 @@ CLASS lcl_aper IMPLEMENTATION.
     ENDLOOP.
 
     SELECT SINGLE kokrs FROM tka02
-      WHERE bukrs = @gs_key-bukrs
+      WHERE bukrs = @gv_bukrs_pag
       INTO @DATA(lv_kokrs).
 
     LOOP AT gt_aper INTO DATA(ls_aper).
@@ -350,11 +362,11 @@ CLASS lcl_aper IMPLEMENTATION.
 
       IF ls_aper-hkont IS NOT INITIAL.
         SELECT SINGLE @abap_true FROM skb1
-          WHERE bukrs = @gs_key-bukrs
+          WHERE bukrs = @gv_bukrs_pag
             AND saknr = @ls_aper-hkont
           INTO @lv_x.
         IF sy-subrc <> 0.
-          MESSAGE |Fila { lv_row }: la cuenta { ls_aper-hkont ALPHA = OUT } no existe en la sociedad { gs_key-bukrs }|
+          MESSAGE |Fila { lv_row }: la cuenta { ls_aper-hkont ALPHA = OUT } no existe en la sociedad { gv_bukrs_pag }|
                   TYPE 'I' DISPLAY LIKE 'E'.
           rv_ok = abap_false.
           RETURN.
@@ -365,11 +377,12 @@ CLASS lcl_aper IMPLEMENTATION.
         SELECT SINGLE @abap_true FROM csks
           WHERE kokrs  = @lv_kokrs
             AND kostl  = @ls_aper-kostl
+            AND bukrs  = @gv_bukrs_pag
             AND datbi >= @sy-datum
             AND datab <= @sy-datum
           INTO @lv_x.
         IF sy-subrc <> 0.
-          MESSAGE |Fila { lv_row }: el centro de coste { ls_aper-kostl ALPHA = OUT } no existe o no es válido|
+          MESSAGE |Fila { lv_row }: el centro de coste { ls_aper-kostl ALPHA = OUT } no existe o no es válido en la sociedad { gv_bukrs_pag }|
                   TYPE 'I' DISPLAY LIKE 'E'.
           rv_ok = abap_false.
           RETURN.
@@ -380,9 +393,10 @@ CLASS lcl_aper IMPLEMENTATION.
         SELECT SINGLE @abap_true FROM aufk
           WHERE aufnr = @ls_aper-nplnr
             AND autyp = '20'
+            AND bukrs = @gv_bukrs_pag
           INTO @lv_x.
         IF sy-subrc <> 0.
-          MESSAGE |Fila { lv_row }: la red { ls_aper-nplnr ALPHA = OUT } no existe|
+          MESSAGE |Fila { lv_row }: la red { ls_aper-nplnr ALPHA = OUT } no existe en la sociedad { gv_bukrs_pag }|
                   TYPE 'I' DISPLAY LIKE 'E'.
           rv_ok = abap_false.
           RETURN.
@@ -392,11 +406,11 @@ CLASS lcl_aper IMPLEMENTATION.
       IF ls_aper-orden IS NOT INITIAL.
         SELECT SINGLE @abap_true FROM aufk
           WHERE aufnr  = @ls_aper-orden
-            AND bukrs  = @gs_key-bukrs
+            AND bukrs  = @gv_bukrs_pag
             AND autyp <> '20'
           INTO @lv_x.
         IF sy-subrc <> 0.
-          MESSAGE |Fila { lv_row }: la orden { ls_aper-orden ALPHA = OUT } no existe en la sociedad { gs_key-bukrs }|
+          MESSAGE |Fila { lv_row }: la orden { ls_aper-orden ALPHA = OUT } no existe en la sociedad { gv_bukrs_pag }|
                   TYPE 'I' DISPLAY LIKE 'E'.
           rv_ok = abap_false.
           RETURN.
@@ -426,9 +440,10 @@ CLASS lcl_aper IMPLEMENTATION.
       IF ls_aper-ps_psp_pnr IS NOT INITIAL.
         SELECT SINGLE @abap_true FROM prps
           WHERE pspnr = @ls_aper-ps_psp_pnr
+            AND pbukr = @gv_bukrs_pag
           INTO @lv_x.
         IF sy-subrc <> 0.
-          MESSAGE |Fila { lv_row }: el elemento PEP no existe|
+          MESSAGE |Fila { lv_row }: el elemento PEP no existe en la sociedad { gv_bukrs_pag }|
                   TYPE 'I' DISPLAY LIKE 'E'.
           rv_ok = abap_false.
           RETURN.
@@ -513,25 +528,25 @@ CLASS lcl_aper IMPLEMENTATION.
 
     CASE e_fieldname.
       WHEN 'HKONT'.
-        " Cuentas de mayor creadas en la sociedad del documento
+        " Cuentas de mayor creadas en la sociedad del pagador
         SELECT SINGLE ktopl FROM t001
-          WHERE bukrs = @gs_key-bukrs
+          WHERE bukrs = @gv_bukrs_pag
           INTO @DATA(lv_ktopl).
         SELECT b~saknr, t~txt50
           FROM skb1 AS b
           LEFT OUTER JOIN skat AS t ON  t~saknr = b~saknr
                                     AND t~ktopl = @lv_ktopl
                                     AND t~spras = @sy-langu
-          WHERE b~bukrs = @gs_key-bukrs
+          WHERE b~bukrs = @gv_bukrs_pag
           ORDER BY b~saknr
           INTO TABLE @DATA(lt_hkont).
         lv_value = f4_popup( EXPORTING iv_retfield = 'SAKNR'
                              CHANGING  ct_values   = lt_hkont ).
 
       WHEN 'KOSTL'.
-        " Centros de coste vigentes de la sociedad del documento
+        " Centros de coste vigentes de la sociedad del pagador
         SELECT SINGLE kokrs FROM tka02
-          WHERE bukrs = @gs_key-bukrs
+          WHERE bukrs = @gv_bukrs_pag
           INTO @DATA(lv_kokrs).
         SELECT c~kostl, t~ktext
           FROM csks AS c
@@ -540,7 +555,7 @@ CLASS lcl_aper IMPLEMENTATION.
                                     AND t~datbi = c~datbi
                                     AND t~spras = @sy-langu
           WHERE c~kokrs  = @lv_kokrs
-            AND c~bukrs  = @gs_key-bukrs
+            AND c~bukrs  = @gv_bukrs_pag
             AND c~datbi >= @sy-datum
             AND c~datab <= @sy-datum
           ORDER BY c~kostl
@@ -549,11 +564,11 @@ CLASS lcl_aper IMPLEMENTATION.
                              CHANGING  ct_values   = lt_kostl ).
 
       WHEN 'NPLNR'.
-        " Redes (grafos) de la sociedad del documento
+        " Redes (grafos) de la sociedad del pagador
         SELECT aufnr, ktext
           FROM aufk
           WHERE autyp = '20'
-            AND bukrs = @gs_key-bukrs
+            AND bukrs = @gv_bukrs_pag
             AND loekz = @space
           ORDER BY aufnr
           INTO TABLE @DATA(lt_nplnr).
@@ -561,11 +576,11 @@ CLASS lcl_aper IMPLEMENTATION.
                              CHANGING  ct_values   = lt_nplnr ).
 
       WHEN 'ORDEN'.
-        " Órdenes (excepto redes) de la sociedad del documento
+        " Órdenes (excepto redes) de la sociedad del pagador
         SELECT aufnr, auart, ktext
           FROM aufk
           WHERE autyp <> '20'
-            AND bukrs  = @gs_key-bukrs
+            AND bukrs  = @gv_bukrs_pag
             AND loekz  = @space
           ORDER BY aufnr
           INTO TABLE @DATA(lt_orden).
@@ -573,10 +588,10 @@ CLASS lcl_aper IMPLEMENTATION.
                              CHANGING  ct_values   = lt_orden ).
 
       WHEN 'PS_PSP_PNR'.
-        " Elementos PEP de la sociedad del documento
+        " Elementos PEP de la sociedad del pagador
         SELECT posid, post1
           FROM prps
-          WHERE pbukr = @gs_key-bukrs
+          WHERE pbukr = @gv_bukrs_pag
             AND loevm = @space
           ORDER BY posid
           INTO TABLE @DATA(lt_pep).

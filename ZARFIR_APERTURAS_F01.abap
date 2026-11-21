@@ -27,6 +27,13 @@ FORM obtener_datos.
     LEAVE LIST-PROCESSING.
   ENDIF.
 
+  " Sociedad del pagador
+  CLEAR gv_vbund.
+  SELECT SINGLE vbund
+    FROM kna1
+    INTO @gv_vbund
+    WHERE kunnr = @gv_kunrg.
+
   " Documentos contables (AWKEY = VBELN de 10 posiciones)
   DATA(lv_awkey) = CONV bkpf-awkey( gv_vbeln ).
 
@@ -117,6 +124,7 @@ FORM crear_arbol.
       CLEAR ls_out.
       ls_out-vbeln = gv_vbeln.
       ls_out-kunrg = gv_kunrg.
+      ls_out-vbund = gv_vbund.
       lv_text = |Factura { gv_vbeln ALPHA = OUT }|.
 
       DATA(lo_node) = lo_nodes->add_node(
@@ -226,6 +234,11 @@ FORM configurar_columnas.
       lo_col->set_medium_text( 'Marca' ).
       lo_col->set_long_text( 'Marca' ).
       lo_col->set_output_length( 6 ).
+
+      lo_col = lo_columns->get_column( 'VBUND' ).
+      lo_col->set_short_text( 'Soc.Pagad.' ).
+      lo_col->set_medium_text( 'Sociedad del Pagador' ).
+      lo_col->set_long_text( 'Sociedad del Pagador' ).
 
       lo_col = lo_columns->get_column( 'DMBTR' ).
       lo_col->set_medium_text( 'Importe ML' ).

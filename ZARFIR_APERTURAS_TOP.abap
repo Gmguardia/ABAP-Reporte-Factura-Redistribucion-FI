@@ -9,6 +9,7 @@
 TYPES: BEGIN OF ty_out,                 " Estructura de salida del árbol
          vbeln TYPE vbrk-vbeln,
          kunrg TYPE vbrk-kunrg,
+         vbund TYPE kna1-vbund,         " Sociedad del pagador
          bukrs TYPE bkpf-bukrs,
          belnr TYPE bkpf-belnr,
          gjahr TYPE bkpf-gjahr,
@@ -50,6 +51,7 @@ TYPES: BEGIN OF ty_map,
 *----------------------------------------------------------------------*
 DATA: gv_vbeln TYPE vbrk-vbeln,
       gv_kunrg TYPE vbrk-kunrg,
+      gv_vbund TYPE kna1-vbund,         " Sociedad del pagador (KNA1-VBUND)
       gt_bkpf  TYPE tt_bkpf,
       gt_bseg  TYPE tt_bseg,
       gt_marc  TYPE SORTED TABLE OF zarfit_fact_marc

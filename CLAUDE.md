@@ -53,7 +53,7 @@ Estructura de includes (orden de inclusión relevante: `CLS` usa datos de `TOP`;
 
 ### Reglas de negocio
 
-- Guardar aperturas (`lcl_aper=>save`): descarta filas vacías → `validate` (convierte HKONT/KOSTL/NPLNR con ALPHA IN; valida contra SKB1, CSKS vigente vía KOKRS de TKA02, AUFK `autyp = '20'`, AFKO/AFVC, PRPS) → la suma de `IMPORTE` debe igualar la suma de DMBTR de las posiciones **marcadas** del documento → `assign_contador` → borrado completo + `INSERT` de las aperturas del documento.
+- Guardar aperturas (`lcl_aper=>save`): descarta filas vacías → `validate` (convierte HKONT/KOSTL/NPLNR con ALPHA IN; valida contra SKB1, CSKS vigente vía KOKRS de TKA02, AUFK `autyp = '20'`, AFKO/AFVC, PRPS). Validaciones y F4 (cuenta, CeCo, red, operación, PEP, orden) usan la **sociedad del pagador** (`KNA1-VBUND` del `KUNRG`, en `gv_vbund` / `lcl_aper=>gv_bukrs_pag`; si está vacía, la del documento con aviso). La clave de `ZARFIT_FACT_APER` sigue siendo la BUKRS del documento contable → la suma de `IMPORTE` debe igualar la suma de DMBTR de las posiciones **marcadas** del documento → `assign_contador` → borrado completo + `INSERT` de las aperturas del documento.
 - `CONTADOR`: autoincremental por documento; filas nuevas o copiadas (contador repetido) reciben máx + 1. También se reasigna en `on_changed_finished`.
 - Al grabar marcas, `verificar_aperturas` avisa (no bloquea) si el total marcado difiere de las aperturas ya grabadas.
 - Mensajes de error al usuario con `TYPE 'I' DISPLAY LIKE 'E'` para no abandonar los controles.
